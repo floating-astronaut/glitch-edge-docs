@@ -1,0 +1,54 @@
+---
+title: "Glitch Edge"
+sidebarTitle: "Introduction"
+description: "AI-automated sports betting + prediction markets. Bring your Cloudbet key, define strategies, let the worker place bets responsibly."
+---
+
+Glitch Edge is a SaaS platform that automates sportsbook + prediction-market bets on
+**your** account. You paste a Cloudbet API key, define a strategy as a small set of
+rules, and a server-side worker evaluates live odds every 60 seconds and places bets
+that match your rules — with hard bankroll caps you set.
+
+We don't custody money. Funds stay on Cloudbet. Glitch Edge is the automation layer
+on top of an account you already own.
+
+## What this docs site covers
+
+<CardGroup cols={2}>
+  <Card title="Getting started" icon="rocket" href="/getting-started/quickstart">
+    Sign up, paste your Cloudbet key, create your first paper strategy in under five
+    minutes.
+  </Card>
+  <Card title="API reference" icon="code" href="/api-reference">
+    Every route the SPA uses is a public REST endpoint. Authenticate with a personal
+    API key (`Authorization: Bearer gle_*****`) and script Glitch Edge from anywhere.
+  </Card>
+  <Card title="Strategy DSL" icon="brain" href="/concepts/strategies">
+    Three sections — match, filter, sizing. Sport, market, odds range, side,
+    stake method. Worker-readable in milliseconds.
+  </Card>
+  <Card title="MCP server" icon="robot" href="/api/mcp">
+    Hook your Claude / Cursor / Gemini directly into Glitch Edge via the
+    Model Context Protocol. Bring your own AI agent to manage strategies.
+  </Card>
+</CardGroup>
+
+## Safety posture
+
+Every part of the platform is paper-first and audit-logged:
+
+- **Paper by default.** New strategies are paused + paper-only. The worker writes
+  simulated bets to your ledger so you can validate edge before flipping live.
+- **Bankroll caps are hard guards.** A strategy refuses to place a bet that would push
+  its rolling 24-hour stake past `bankroll_cap`. Same enforcement in paper + live so
+  you can validate the cap behavior before risking money.
+- **Audit log on every state change.** Key access, strategy edits, bet placement, bet
+  settlement, login events. Visible to you at `/app/activity`.
+- **Encrypted keys at rest.** Cloudbet API keys are AES-256-GCM-encrypted with a server
+  master key that's distinct from your account password.
+
+## What this is not
+
+Glitch Edge is not a tipster, an "AI picks" service, or a guaranteed-returns product.
+It's infrastructure for people who already have opinions about markets and want to
+execute those opinions consistently. The math is real but the edge depends on you.

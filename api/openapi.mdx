@@ -1,0 +1,58 @@
+---
+title: "OpenAPI"
+description: "The full machine-readable API contract is published at /api/openapi.json — the same source that powers this docs site's API reference tab."
+---
+
+The Glitch Edge API is described by a single OpenAPI 3.1 document that's regenerated
+on every API deploy:
+
+```text
+https://edge.glitchexecutor.com/api/openapi.json
+```
+
+The **API reference** tab on this docs site renders directly from that URL, so the
+two are guaranteed in sync.
+
+## Using it
+
+<CodeGroup>
+```bash curl
+curl https://edge.glitchexecutor.com/api/openapi.json | jq '.paths | keys[]'
+```
+
+```python httpx + pydantic-openapi
+import httpx
+spec = httpx.get("https://edge.glitchexecutor.com/api/openapi.json").json()
+print(len(spec["paths"]), "routes")
+```
+
+```typescript Generate a typed client
+# bun add -D openapi-typescript
+bunx openapi-typescript https://edge.glitchexecutor.com/api/openapi.json \
+  -o src/glitch-edge.d.ts
+```
+</CodeGroup>
+
+## Versioning
+
+The spec carries `info.version` matching the deployed `glitch-edge-api` release.
+Breaking changes get a new major; route shapes are stable within a major.
+
+| Version | Notes |
+|---|---|
+| `0.1.x` | Current. Routes are stable; we may still add fields. |
+
+The **change you should care about most** right now: when we flip live trading on
+generally, the response shape of `POST /v1/bets` (and downstream settlement)
+will gain `clob_order_id` / `cloudbet_bet_id` fields. Existing fields won't move.
+
+## Interactive playground
+
+The FastAPI-bundled Swagger UI lives at:
+
+```text
+https://edge.glitchexecutor.com/api/docs
+```
+
+Authenticate there with your Bearer token via the **Authorize** button (top right)
+and you can fire requests live against the running API.

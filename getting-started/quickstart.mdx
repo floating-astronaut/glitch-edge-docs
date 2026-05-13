@@ -1,0 +1,95 @@
+---
+title: "Quickstart"
+description: "Five-minute path from signup to a paper strategy ticking against live Cloudbet odds."
+---
+
+This is the path from zero to a working paper strategy. Total time: about five minutes,
+assuming you already have a Cloudbet account.
+
+## 1. Create your Glitch Edge account
+
+Go to <Tooltip tip="The app lives here. Marketing + pricing at the root.">[edge.glitchexecutor.com/app/](https://edge.glitchexecutor.com/app/)</Tooltip>
+and click **Create account**. Either:
+
+- Email + password (8+ chars)
+- Continue with Google
+
+Both sign-in methods can link to the same account by email.
+
+## 2. Get a Cloudbet API key
+
+<Note>
+  Glitch Edge places bets through your Cloudbet account — funds stay there.
+  We never custody money.
+</Note>
+
+1. Sign in to Cloudbet (or [create an account via our affiliate link](https://www.cloudbet.com/en/join?af_token=01f079547c54b937449de8ab33567f55) — costs you nothing, keeps the Free tier free)
+2. Deposit at least **€10** to unlock API access
+3. In your Cloudbet account page, generate an **API key** and copy it
+
+## 3. Connect the key
+
+In Glitch Edge, navigate to **Cloudbet Key** in the sidebar and click **Add key**.
+
+<Steps>
+  <Step title="Paste the key">
+    The full JWT. We validate it against Cloudbet **before** storing it — invalid
+    keys are rejected outright; nothing reaches the database.
+  </Step>
+  <Step title="Label it">
+    Default works. The label is for your own bookkeeping if you ever have multiple
+    keys.
+  </Step>
+  <Step title="Confirm">
+    On success the key card shows the fingerprint (first 3 + last 4 chars), an
+    "active" badge, and "Last verified just now".
+  </Step>
+</Steps>
+
+## 4. Define your first strategy
+
+Click **Strategies** → **New strategy**. Three sections:
+
+<AccordionGroup>
+  <Accordion title="Match">
+    Sport + market + optional league.
+
+    Example: `basketball / moneyline / NBA`
+  </Accordion>
+  <Accordion title="Filter">
+    Odds range + side.
+
+    Example: `min 1.5, max 3.0, BACK` — only fires on bets priced between 1.5 and 3.0
+    on the back side of the market.
+  </Accordion>
+  <Accordion title="Sizing">
+    Method + value.
+
+    Example: `fixed_fraction / 0.02` — stakes 2% of `stake_cap` per bet.
+  </Accordion>
+</AccordionGroup>
+
+You'll also set:
+
+- **Daily bankroll cap** — hard limit on rolling-24h stake. Worker refuses to exceed.
+- **Per-bet stake cap** — max stake on any single bet.
+
+New strategies start **paused + paper-only**. You explicitly flip both flags when ready.
+
+## 5. Resume the strategy
+
+On the strategy card, click **Resume**. The worker will pick it up on the next tick
+(within 60 seconds). Watch **Bets** in the sidebar — paper bets will appear as the
+worker finds qualifying events.
+
+## What's next
+
+<CardGroup cols={2}>
+  <Card title="Read the API reference" icon="code" href="/api-reference">
+    Every UI action is also a REST endpoint. Script Glitch Edge from Python, curl,
+    or your AI agent of choice.
+  </Card>
+  <Card title="Get an API key" icon="key" href="/getting-started/authentication">
+    Personal access tokens for scripting + the MCP server.
+  </Card>
+</CardGroup>

@@ -1,0 +1,77 @@
+---
+title: "Bankroll management"
+description: "How Glitch Edge enforces stake caps + rolling 24h bankroll caps — same in paper and live."
+---
+
+Two hard guards every strategy carries. Both are enforced server-side, before
+any Cloudbet call.
+
+## `stake_cap`
+
+Maximum stake on **a single bet**, in the strategy's currency. Sizing is computed
+as `stake_cap × sizing.value` and then clamped to `stake_cap`. If `sizing.value`
+is `0.02` and `stake_cap` is `5`, every bet is exactly 0.10 currency units.
+
+This is intentionally simple. v2 will allow `kelly` sizing pegged to live Cloudbet
+balance.
+
+## `bankroll_cap`
+
+A **rolling 24-hour** total. Before inserting a new bet, the worker queries:
+
+```sql
+SELECT COALESCE(SUM(stake), 0)
+FROM bets
+WHERE strategy_id = $1
+  AND status <> 'ERROR'
+  AND placed_at > now() - interval '24 hours'
+```
+
+If `used_24h + new_stake > bankroll_cap`, the worker skips with a
+`bankroll_cap_exceeded` decision (visible in `/v1/worker/status.recent_decisions`
+and `/v1/audit?action_prefix=bet.`).
+
+A few details:
+
+- **Rolling, not calendar.** "Last 24 hours" — a bet placed at 23:00 yesterday
+  is still in your active stake window today.
+- **Paper bets count.** Same enforcement in paper + live so you can validate cap
+  behavior before going live.
+- **Errored bets don't count.** Cloudbet-rejected bets (`status='ERROR'`) didn't
+  consume bankroll, so we exclude them from the rolling total.
+- **Per-strategy, not per-user.** If you run multiple strategies each with cap
+  `100`, your account can stake up to `100 × N` in 24h. Set caps proportionally
+  to your true risk tolerance.
+
+## Recommended cap setup
+
+For a new strategy in paper mode:
+
+- `stake_cap`: 5–10 currency units (so each bet is small)
+- `sizing.value`: `0.02`–`0.05` (so each bet is 2–5% of `stake_cap`)
+- `bankroll_cap`: `stake_cap × expected_bets_per_day × 1.5` — gives headroom
+  before the cap fires, but fires before the strategy can over-trade.
+
+When flipping to live, halve `stake_cap` for the first week regardless of paper
+performance. Real-money sizing always reveals issues paper doesn't.
+
+## Failure modes
+
+| Scenario | What happens |
+|---|---|
+| New bet alone exceeds `stake_cap` | Stake is clamped to `stake_cap` before any cap check |
+| Cumulative would exceed `bankroll_cap` | Bet is skipped, audit-logged, no further attempts this tick |
+| Cloudbet rejects a live bet | Row is inserted with `status='ERROR'`; stake **not** counted toward bankroll_cap |
+| Cloudbet partial fill | `stake` is the requested amount; `return_amount` reflects actual fill on settlement |
+
+## Inspecting cap state
+
+The worker writes everything to audit:
+
+```bash
+curl -H "Authorization: Bearer gle_*****" \
+  "https://edge.glitchexecutor.com/api/v1/audit?action_prefix=bet."
+```
+
+Look for `polymarket.order.place` / `bet.place` rows + the cap rejections in
+`/v1/worker/status.recent_decisions`.

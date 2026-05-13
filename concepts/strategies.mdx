@@ -1,0 +1,98 @@
+---
+title: "Strategies & the DSL"
+description: "Three-section DSL — match, filter, sizing — that the worker evaluates against live Cloudbet odds every 60 seconds."
+---
+
+A strategy is a JSON document attached to a sport and a set of caps. The worker
+reads it, fetches matching events from Cloudbet, and decides whether to place a bet.
+
+## Shape
+
+```json
+{
+  "name": "NBA road favs",
+  "sport": "basketball",
+  "rules": {
+    "match":  { "sport": "basketball", "league": "NBA", "market": "moneyline" },
+    "filter": { "min_odds": 1.5, "max_odds": 3.0, "side": "BACK" },
+    "sizing": { "method": "fixed_fraction", "value": 0.02 }
+  },
+  "bankroll_cap": 100,
+  "stake_cap": 5
+}
+```
+
+## `match`
+
+Which events the strategy considers.
+
+| Field | Required | Notes |
+|---|---|---|
+| `sport` | yes | One of `basketball`, `cricket`, `soccer`, `tennis`, `baseball`, `hockey`. Must equal the strategy's top-level `sport`. |
+| `league` | no | Free text — Cloudbet event names get fuzzy-matched. |
+| `market` | yes | `moneyline`, `total`, or `spread`. |
+
+## `filter`
+
+Which prices on those events the strategy will act on.
+
+| Field | Notes |
+|---|---|
+| `min_odds` | Inclusive lower bound. Must be > 1.0. |
+| `max_odds` | Must be > `min_odds`. |
+| `side` | `BACK` or `LAY`. Most users want `BACK`. |
+
+## `sizing`
+
+How much to stake when a filter matches.
+
+| Method | Stake |
+|---|---|
+| `fixed_fraction` | `stake_cap × value` (with `value` in 0..1) |
+| `kelly` | Same as `fixed_fraction` today — true Kelly is on the roadmap. |
+
+## `bankroll_cap` + `stake_cap`
+
+These are hard guards the worker enforces before every bet.
+
+- **`stake_cap`** — maximum stake on any single bet, in the strategy's currency.
+- **`bankroll_cap`** — rolling-24-hour total stake. If `placing this bet would push
+  total stake placed in the last 24 hours past bankroll_cap`, the worker skips it
+  and writes a `bankroll_cap_exceeded` audit entry.
+
+Both caps are enforced in **paper** and **live** mode, so you can validate cap
+behavior before flipping `paper_only=false`.
+
+## Lifecycle flags
+
+- `is_paused` — when true, worker skips the strategy entirely. New strategies
+  default to `true`.
+- `paper_only` — when true, worker writes a paper bet (no Cloudbet call) and
+  derives settlement from event results. Defaults to `true`.
+
+Flipping `paper_only=false` is necessary but not sufficient for live bets — the
+server also needs `EDGE_ALLOW_LIVE_BETS=true` (admin gate). Both flags together
+unlock real money.
+
+## Live evaluation
+
+The worker ticks every 60 seconds. Per tick, for each non-paused strategy:
+
+1. Decrypt the user's active Cloudbet key
+2. Fetch upcoming events for `sport` (Cloudbet `/pub/v2/odds/events`)
+3. For each event:
+   - Extract the price for the configured market + side
+   - Reject if price out of `[min_odds, max_odds]`
+   - Reject if a bet already exists for this `(strategy, event)` in last 24h
+   - Compute stake = `stake_cap × sizing.value`
+   - If `used_24h + stake > bankroll_cap`, skip
+   - Insert the bet (paper or live based on flags)
+4. Settle finished bets every 5 minutes via Cloudbet `bet_status` (live) or event
+   result derivation (paper) — `moneyline`, `total`, and `spread` markets supported.
+
+## Editing a strategy
+
+`PATCH /v1/strategies/{id}` supports partial updates. The worker re-reads on every
+tick so changes take effect within ~60s. One invariant the API enforces:
+`rules.match.sport` must equal the strategy's top-level `sport` — to change sports,
+create a new strategy.

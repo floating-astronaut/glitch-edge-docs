@@ -1,0 +1,89 @@
+---
+title: "Authentication"
+description: "Two ways to authenticate to the Glitch Edge API: session cookie (browser) and personal API key (scripts + MCP)."
+---
+
+The Glitch Edge API supports two authentication paths. Same routes, same shapes; the
+auth header just changes.
+
+## 1. Session cookie (browser)
+
+The SPA at `/app/` sets a `glitch_edge_session` HTTP-only cookie scoped to
+`.glitchexecutor.com`. Every browser request to `/api/*` carries it automatically.
+Cookie auth is opaque to you — you never see the JWT.
+
+```bash
+# in a browser fetch() the cookie is sent automatically:
+fetch('/api/v1/me', { credentials: 'include' })
+```
+
+## 2. Personal API key (scripts + MCP)
+
+Generate from <Tooltip tip="Settings → API keys → New key">**Settings → API keys**</Tooltip>
+in the app. Token format:
+
+```text
+gle_<8 alnum>.<32 alnum>
+```
+
+The token is shown **once** at creation. If you lose it, revoke + create a new one.
+
+<Warning>
+  Treat tokens like passwords. One token = full access to the owner's account. Glitch
+  Edge will never ask you to share a token over chat / email.
+</Warning>
+
+### Using a token
+
+Pass it as a Bearer token in the `Authorization` header:
+
+```bash
+curl -H "Authorization: Bearer gle_xxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  https://edge.glitchexecutor.com/api/v1/me
+```
+
+```python Python
+import httpx
+
+token = "gle_xxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+r = httpx.get(
+    "https://edge.glitchexecutor.com/api/v1/me",
+    headers={"Authorization": f"Bearer {token}"},
+)
+print(r.json())
+```
+
+```typescript TypeScript / Node
+const token = "gle_xxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+const r = await fetch("https://edge.glitchexecutor.com/api/v1/me", {
+  headers: { Authorization: `Bearer ${token}` },
+})
+console.log(await r.json())
+```
+
+### Token rotation + revocation
+
+- Revoke any time at Settings → API keys. Existing scripts get `401 invalid_api_key`
+  immediately.
+- Last-used timestamp is updated on every authed request — handy for spotting
+  forgotten keys.
+- We never auto-expire tokens, but you can set `expires_at` via the API on creation
+  if your security model wants finite TTL. (Self-managed; we don't rotate for you.)
+
+### Errors
+
+| HTTP | code | meaning |
+|------|------|---------|
+| 401 | `auth_required` | No cookie + no Bearer header |
+| 401 | `invalid_api_key` | Bearer was present but malformed / expired / revoked |
+| 403 | (no code) | Token resolved to a user that can't do this action |
+
+A bogus Bearer **always** 401s without falling through to cookie auth — that's
+intentional. If your script sends a bad token, you should see the error, not silently
+fall back.
+
+## Logout / sign-out
+
+- Cookie path: `POST /api/v1/auth/logout` clears the cookie.
+- API key path: revoke the key. Logging out of a browser session does not affect
+  API keys, and revoking an API key does not log you out of browser sessions.

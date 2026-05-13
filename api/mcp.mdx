@@ -1,0 +1,73 @@
+---
+title: "MCP server"
+description: "Hook Claude / Cursor / Gemini directly into Glitch Edge via the Model Context Protocol. Bring your own AI agent."
+---
+
+<Note>
+  The MCP server is **on the roadmap**, not yet shipped. This page is a
+  forward-looking spec — what it'll look like when it lands.
+</Note>
+
+## What it'll be
+
+A small streamable-HTTP MCP server at `https://mcp.edge.glitchexecutor.com` that
+wraps every route on the public API and exposes them as MCP **tools**. Auth = the
+same personal API key you use for the REST API.
+
+## Why
+
+Glitch Edge is positioning around AI agents managing strategies. MCP closes the
+loop: instead of telling Claude "go write a Python script that calls these
+endpoints to monitor my account," you tell Claude "use my Glitch Edge MCP" — and
+Claude has direct, typed, scoped tools.
+
+## Tools (sketch)
+
+```text
+list_strategies      ()                                  → Strategy[]
+get_strategy         (id: uuid)                          → Strategy
+create_strategy     (name, sport, rules, caps...)       → Strategy
+pause_strategy      (id: uuid)                          → Strategy
+resume_strategy      (id: uuid)                          → Strategy
+list_bets            (since?, until?, paper?)            → Bet[]
+my_bankroll          ()                                  → Balance[]
+my_polymarket_balance ()                                  → Balance[]
+recent_activity      (action_prefix?, limit?)            → AuditEntry[]
+place_paper_order_polymarket (market_id, token, ...)     → Order
+```
+
+We deliberately won't expose the full `/v1/keys` CRUD as MCP tools — having an
+agent able to mint or revoke its own auth credential is too sharp an edge. Key
+management stays in the SPA.
+
+## Setup (when it ships)
+
+```jsonc Claude Desktop ~/Library/Application Support/Claude/claude_desktop_config.json
+{
+  "mcpServers": {
+    "glitch-edge": {
+      "transport": "streamable-http",
+      "url": "https://mcp.edge.glitchexecutor.com",
+      "headers": {
+        "Authorization": "Bearer gle_xxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+    }
+  }
+}
+```
+
+Same `gle_*` token as the REST API. Per-user, scoped to one user's account.
+
+## Status
+
+```text
+[ ] glitch-edge-mcp repo + scaffold
+[ ] tool surface (the list above)
+[ ] auth: Authorization header → CurrentUserDep
+[ ] streamable-HTTP transport @ mcp.edge.glitchexecutor.com
+[ ] Mintlify docs page for setup instructions
+[ ] Claude.ai web connector listing
+```
+
+Subscribe to the [Glitch Edge changelog](https://edge.glitchexecutor.com/blog/)
+or watch the repo on GitLab for when this lands.

@@ -1,0 +1,67 @@
+---
+title: "Settlement"
+description: "How Glitch Edge resolves bets — Cloudbet's authoritative status for live, event-result derivation for paper, supports moneyline + total + spread markets."
+---
+
+After a bet is placed, the **settle watcher** runs every 5 minutes to reconcile
+finished events. Two paths.
+
+## Pass 1 — live bets (authoritative)
+
+For live bets (`paper=false`, `reference_id` set), the watcher polls:
+
+```http
+GET https://sports-api.cloudbet.com/pub/v3/bets/{reference_id}/status
+```
+
+Cloudbet's own `state` field is authoritative — `WIN`, `LOSS`, `PUSH`, `HALF_WIN`,
+`HALF_LOSS`, `PARTIAL`. `return_amount` comes from the response too; if Cloudbet
+omits it for older state shapes, we derive from `stake × (price - 1)` for WIN /
+`-stake` for LOSS.
+
+Audit entries on this path carry `source: 'bet_status'`.
+
+## Pass 2 — paper bets (event-result derivation)
+
+Paper bets never touched Cloudbet, so the watcher pulls the underlying event
+once per `event_id` and derives the outcome locally. Three market types supported:
+
+| Market | Selection | Threshold from | Settles |
+|---|---|---|---|
+| `moneyline` | `home` / `away` / `draw` | n/a | WIN if `selection == winner`; draw vs home/away is a LOSS for BACK / WIN for LAY |
+| `total` | `over` / `under` | `?total=` `?lines=` `?points=` | WIN if total comparison matches; **PUSH on exact threshold** |
+| `handicap` / `spread` | `home` / `away` | `?handicap=` `?spread=` `?line=` | Margin + handicap; **PUSH on exact line**; **Asian quarter handicaps (.25/.75) deferred** |
+
+Audit entries on this path carry `source: 'event_result'`.
+
+## Edge cases
+
+- **Cancelled events** — Cloudbet returns 404 for the event id. All bets on that
+  event are marked `CANCELLED` with `settled_at=now()`, `return_amount=0`.
+- **Asian quarter handicaps** — split-stake markets (`-0.25`, `-0.75`, etc.).
+  Settlement model is more complex; for now these bets stay pending. Use full
+  or half lines if you want them to auto-settle.
+- **Unsupported markets** — anything outside moneyline/total/spread stays
+  pending. Logged as `unsupported-market-or-data` in `worker.settle/status.recent`.
+- **Push** — exact threshold match. `return_amount=0`, status `PUSH`. Stake
+  returned but doesn't count as W or L in the dashboard's win-rate KPI.
+
+## Inspecting settlement
+
+```bash
+# What did the settle watcher do most recently?
+curl -H "Authorization: Bearer gle_*****" \
+  https://edge.glitchexecutor.com/api/v1/worker/settle/status
+
+# Filter audit log to just settlements:
+curl -H "Authorization: Bearer gle_*****" \
+  "https://edge.glitchexecutor.com/api/v1/audit?action_prefix=bet.settle"
+```
+
+## Why two passes
+
+Live bets settle from Cloudbet directly — that's authoritative for everything
+(half-wins, partials, refunds, etc.). Paper bets have no Cloudbet record to
+poll, so we derive what the outcome **would have been** from event scores. Both
+populate the same `bets.status` + `bets.return_amount` columns, so dashboards
+don't care which path produced the row.

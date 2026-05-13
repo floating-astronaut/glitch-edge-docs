@@ -1,0 +1,74 @@
+---
+title: "Audit log"
+description: "Every state change on your account — what you did, what the worker did, what the settle watcher did. Source of truth, not a summary."
+---
+
+Glitch Edge writes an audit row on every state change. The `/app/activity` page
+in the SPA is a viewer on top of it; the API exposes the same data via
+`GET /v1/audit`.
+
+## Schema
+
+```sql
+audit_log (
+  id        bigserial,
+  at        timestamptz,
+  user_id   uuid,
+  actor     text,        -- 'user' | 'worker' | 'settle' | 'system'
+  action    text,        -- 'bet.place', 'strategy.update', ...
+  target_id text,        -- bet id / strategy id / key id / etc.
+  detail    jsonb        -- per-action payload
+)
+```
+
+## Actions
+
+| Prefix | Actor | Emitted when |
+|---|---|---|
+| `auth.login` | user | Successful password / Google login |
+| `auth.logout` | user | Explicit sign-out (clears the JWT cookie) |
+| `auth.register` | user | New email/password account |
+| `auth.register.google` | user | First Google login (creates a new row) |
+| `auth.set_password` | user | Password change / first-set |
+| `key.create` | user | Cloudbet API key added (validated against Cloudbet first) |
+| `key.verify` | user | Re-test of a stored Cloudbet key |
+| `key.delete` | user | Cloudbet key soft-deleted (is_active=false) |
+| `strategy.create` | user | New strategy |
+| `strategy.update` | user | Patch (fields listed in `detail.fields`) |
+| `strategy.toggle` | user | `paused` / `paper_only` flip |
+| `strategy.delete` | user | Hard delete |
+| `bet.place` | worker | Worker placed a paper or live bet |
+| `bet.settle` | settle | Bet resolved — `detail.source` is `bet_status` or `event_result` |
+| `api_key.create` | user | Personal API token minted |
+| `api_key.revoke` | user | Personal API token revoked |
+| `polymarket.wallet.create` | user | CDP-managed Polygon wallet provisioned |
+| `polymarket.trading.enable` | user | Trading-consent flip (with phrase echo) |
+| `polymarket.order.place` | user | Polymarket order placed (paper-only today) |
+
+## Reading the log
+
+```bash Filter to bet activity
+curl -H "Authorization: Bearer gle_*****" \
+  "https://edge.glitchexecutor.com/api/v1/audit?action_prefix=bet."
+```
+
+```bash Get most recent 100
+curl -H "Authorization: Bearer gle_*****" \
+  "https://edge.glitchexecutor.com/api/v1/audit?limit=100"
+```
+
+```bash Summary counts (per-action totals)
+curl -H "Authorization: Bearer gle_*****" \
+  https://edge.glitchexecutor.com/api/v1/audit/summary
+```
+
+## Why this is non-negotiable
+
+Cloudbet has its own bet ledger. Glitch Edge has the **decision** ledger: not
+just "what bet got placed" but "why" — which strategy, what the market price
+was, whether bankroll caps were checked, what the worker thought it was doing.
+That history is what lets you debug a strategy six months later, or prove to
+yourself that the platform did exactly what you asked it to.
+
+We never delete audit rows. We do not redact them on user request. They live
+forever (well — until you delete your account, which cascades them).

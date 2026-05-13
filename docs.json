@@ -1,0 +1,87 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "maple",
+  "name": "Glitch Edge",
+  "description": "AI-automated sports betting + prediction markets. Bring your Cloudbet key, define strategies, let the worker place bets responsibly.",
+  "colors": {
+    "primary": "#0164ff",
+    "light":   "#3a8bff",
+    "dark":    "#0150d0"
+  },
+  "favicon": "/favicon.png",
+  "logo": {
+    "light": "/logos/glitch-edge.svg",
+    "dark":  "/logos/glitch-edge.svg",
+    "href":  "https://edge.glitchexecutor.com/"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Getting started",
+            "pages": [
+              "getting-started/introduction",
+              "getting-started/quickstart",
+              "getting-started/authentication"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "concepts/strategies",
+              "concepts/bankroll-management",
+              "concepts/settlement",
+              "concepts/audit-log"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "api/openapi",
+              "api/mcp"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API reference",
+        "openapi": {
+          "source": "https://edge.glitchexecutor.com/api/openapi.json",
+          "directory": "api-reference"
+        }
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Status",
+          "href": "https://edge.glitchexecutor.com/api/healthz",
+          "icon": "heart-pulse"
+        }
+      ]
+    }
+  },
+  "navbar": {
+    "links": [
+      { "label": "App",       "href": "https://edge.glitchexecutor.com/app/" },
+      { "label": "Pricing",   "href": "https://edge.glitchexecutor.com/pricing/" }
+    ],
+    "primary": {
+      "type":  "button",
+      "label": "Sign in",
+      "href":  "https://edge.glitchexecutor.com/app/"
+    }
+  },
+  "footer": {
+    "socials": {
+      "x":      "https://x.com/glitchexecutor",
+      "github": "https://gitlab.com/glitch-exec-labs-group"
+    }
+  },
+  "fonts": {
+    "heading": { "family": "Inter Tight" },
+    "body":    { "family": "Inter Tight" }
+  }
+}
